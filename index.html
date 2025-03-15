@@ -1,236 +1,60 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>¿Puedo bajar a mi hijo al parque?</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: Arial, sans-serif;
-        }
-        .container {
-            max-width: 600px;
-            margin: 50px auto;
-            text-align: center;
-        }
-        h1 {
-            color: #343a40;
-        }
-        p {
-            font-size: 18px;
-            color: #6c757d;
-        }
-        #response {
-            font-size: 24px;
-            font-weight: bold;
-            margin-top: 20px;
-        }
-        #response.success {
-            color: #28a745; /* Verde */
-        }
-        #response.danger {
-            color: #dc3545; /* Rojo */
-        }
-        .loading {
-            color: #007bff; /* Azul */
-        }
-        button {
-            margin-top: 20px;
-            padding: 12px 24px;
-            font-size: 18px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        button.primary {
-            background-color: #007bff;
-            color: white;
-        }
-        button.primary:hover {
-            background-color: #0056b3;
-        }
-        button.secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-        button.secondary:hover {
-            background-color: #5a6268;
-        }
-        footer {
-            margin-top: 50px;
-            font-size: 14px;
-            color: #aaa;
-            text-align: center;
-        }
-        /* Estilos para las imágenes del clima */
-        #weather-image {
-            width: 100%;
-            height: auto;
-            margin-top: 20px;
-            border-radius: 10px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>¿Puedo bajar a mi hijo al parque?</h1>
-        <p>Haz clic en el botón para averiguar.</p>
+// Función principal para obtener y mostrar el clima
+async function fetchAndDisplayWeather(lat, lon) {
+    const responseDiv = document.getElementById('response');
+    const weatherImage = document.getElementById('weather-image');
+    const forecastDiv = document.getElementById('forecast');
 
-        <!-- Botones -->
-        <button class="primary" onclick="getLocation()">Usar mi ubicación</button>
-        <button class="secondary" onclick="showManualInput()">Ingresar dirección postal</button>
+    try {
+        // Obtener datos actuales del clima
+        const weatherResponse = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`);
+        const weatherData = await weatherResponse.json();
 
-        <!-- Formulario para ingresar dirección postal -->
-        <div id="manual-input" style="display: none; margin-top: 20px;">
-            <input type="text" id="address-input" placeholder="Escribe tu dirección postal" class="form-control" />
-            <button class="primary" style="margin-top: 10px;" onclick="checkWeatherByAddress()">Comprobar</button>
-        </div>
+        const weather = weatherData.weather[0].description;
+        const temp = weatherData.main.temp;
 
-        <!-- Respuesta -->
-        <div id="response"></div>
+        // Mostrar respuesta según el clima
+        if (weather.includes("lluvia") || weather.includes("tormenta") || temp < 10 || temp > 35) {
+            responseDiv.textContent = `NO, no es un buen momento para salir al parque. (${weather}, ${temp}°C)`;
+            responseDiv.className = "danger";
+        } else {
+            responseDiv.textContent = `SÍ, puedes llevar a tu hijo/a al parque. (${weather}, ${temp}°C)`;
+            responseDiv.className = "success";
+        }
 
-        <!-- Imagen del clima -->
-        <img id="weather-image" src="" alt="Imagen del clima" style="display: none;" />
+        // Mostrar imagen del clima usando el icono de OpenWeatherMap
+        const iconCode = weatherData.weather[0].icon; // Código del icono (ej. "01d")
+        const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`; // URL del icono
+        weatherImage.src = iconUrl;
+        weatherImage.alt = weatherData.weather[0].description; // Descripción alternativa
+        weatherImage.style.display = "block";
 
-        <!-- Pronóstico extendido -->
-        <div id="forecast" style="margin-top: 30px;"></div>
-    </div>
+        // Mostrar imagen de la ubicación
+        showLocationImage(lat, lon);
 
-    <footer>
-        <p>Desarrollado por José Miguel Morillo Gómez &copy; 2025</p>
-    </footer>
+        // Buscar parques cercanos
+        findNearbyParks(lat, lon);
 
-    <script>
-        // TU CLAVE DE API DE OPENWEATHER
-        const apiKey = "56b4e0af95612c13f91a673f2d132b71";
+        // Obtener pronóstico extendido
+        const forecastResponse = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`);
+        const forecastData = await forecastResponse.json();
 
-        // Obtener ubicación automáticamente
-        function getLocation() {
-            const responseDiv = document.getElementById('response');
-            responseDiv.textContent = "Obteniendo ubicación...";
-            responseDiv.className = "loading";
+        let forecastHTML = "<h3>Pronóstico para los próximos días:</h3><ul>";
+        const uniqueDates = new Set();
 
-            if (!navigator.geolocation) {
-                responseDiv.textContent = "La geolocalización no es compatible con tu navegador.";
-                responseDiv.className = "";
-                return;
+        forecastData.list.forEach(item => {
+            const date = item.dt_txt.split(" ")[0];
+            if (!uniqueDates.has(date)) {
+                uniqueDates.add(date);
+                const dayWeather = item.weather[0].description;
+                const dayTemp = item.main.temp;
+                forecastHTML += `<li>${date}: ${dayWeather}, ${dayTemp}°C</li>`;
             }
+        });
 
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                await fetchAndDisplayWeather(lat, lon);
-            }, () => {
-                responseDiv.textContent = "No se pudo obtener la ubicación.";
-                responseDiv.className = "";
-            });
-        }
-
-        // Mostrar formulario para ingresar dirección postal
-        function showManualInput() {
-            document.getElementById('manual-input').style.display = 'block';
-        }
-
-        // Comprobar clima por dirección postal
-        async function checkWeatherByAddress() {
-            const address = document.getElementById('address-input').value.trim();
-            if (!address) {
-                alert("Por favor, ingresa una dirección postal.");
-                return;
-            }
-
-            const responseDiv = document.getElementById('response');
-            responseDiv.textContent = "Buscando ubicación...";
-            responseDiv.className = "loading";
-
-            try {
-                // Convertir dirección postal a coordenadas
-                const geoResponse = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(address)}&limit=1&appid=${apiKey}`);
-                const geoData = await geoResponse.json();
-
-                if (geoData.length === 0) {
-                    responseDiv.textContent = "Ubicación no encontrada.";
-                    responseDiv.className = "";
-                    return;
-                }
-
-                const lat = geoData[0].lat;
-                const lon = geoData[0].lon;
-                await fetchAndDisplayWeather(lat, lon);
-            } catch (error) {
-                responseDiv.textContent = "Hubo un error al buscar la ubicación.";
-                responseDiv.className = "";
-            }
-        }
-
-        // Obtener y mostrar el clima
-        async function fetchAndDisplayWeather(lat, lon) {
-            const responseDiv = document.getElementById('response');
-            const weatherImage = document.getElementById('weather-image');
-            const forecastDiv = document.getElementById('forecast');
-
-            try {
-                // Obtener datos actuales del clima
-                const weatherResponse = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`);
-                const weatherData = await weatherResponse.json();
-
-                const weather = weatherData.weather[0].description;
-                const temp = weatherData.main.temp;
-
-                // Mostrar respuesta según el clima
-                if (weather.includes("lluvia") || weather.includes("tormenta") || temp < 10 || temp > 35) {
-                    responseDiv.textContent = `NO, no es un buen momento para salir al parque. (${weather}, ${temp}°C)`;
-                    responseDiv.className = "danger";
-                } else {
-                    responseDiv.textContent = `SÍ, puedes llevar a tu hijo/a al parque. (${weather}, ${temp}°C)`;
-                    responseDiv.className = "success";
-                }
-
-                // Mostrar imagen del clima
-                const weatherCondition = weatherData.weather[0].main.toLowerCase();
-                let imageUrl = "";
-                if (weatherCondition.includes("clear")) {
-                    imageUrl = "https://via.placeholder.com/600x300?text=☀️+Soleado";
-                } else if (weatherCondition.includes("clouds")) {
-                    imageUrl = "https://via.placeholder.com/600x300?text=☁️+Nublado";
-                } else if (weatherCondition.includes("rain")) {
-                    imageUrl = "https://via.placeholder.com/600x300?text=🌧️+Lluvia";
-                } else if (weatherCondition.includes("thunderstorm")) {
-                    imageUrl = "https://via.placeholder.com/600x300?text=⚡+Tormenta";
-                } else {
-                    imageUrl = "https://via.placeholder.com/600x300?text=🌤️+Otro";
-                }
-                weatherImage.src = imageUrl;
-                weatherImage.style.display = "block";
-
-                // Obtener pronóstico extendido
-                const forecastResponse = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`);
-                const forecastData = await forecastResponse.json();
-
-                let forecastHTML = "<h3>Pronóstico para los próximos días:</h3><ul>";
-                const uniqueDates = new Set();
-
-                forecastData.list.forEach(item => {
-                    const date = item.dt_txt.split(" ")[0];
-                    if (!uniqueDates.has(date)) {
-                        uniqueDates.add(date);
-                        const dayWeather = item.weather[0].description;
-                        const dayTemp = item.main.temp;
-                        forecastHTML += `<li>${date}: ${dayWeather}, ${dayTemp}°C</li>`;
-                    }
-                });
-
-                forecastHTML += "</ul>";
-                forecastDiv.innerHTML = forecastHTML;
-            } catch (error) {
-                responseDiv.textContent = "Hubo un error al obtener los datos del clima.";
-                responseDiv.className = "";
-            }
-        }
-    </script>
-</body>
-</html>
+        forecastHTML += "</ul>";
+        forecastDiv.innerHTML = forecastHTML;
+    } catch (error) {
+        responseDiv.textContent = "Hubo un error al obtener los datos del clima.";
+        responseDiv.className = "";
+    }
+}
