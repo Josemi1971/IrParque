@@ -66,6 +66,13 @@
             color: #aaa;
             text-align: center;
         }
+        /* Estilos para las imágenes del clima */
+        #weather-image {
+            width: 100%;
+            height: auto;
+            margin-top: 20px;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body>
@@ -75,16 +82,19 @@
 
         <!-- Botones -->
         <button class="primary" onclick="getLocation()">Usar mi ubicación</button>
-        <button class="secondary" onclick="showManualInput()">Ingresar ubicación manualmente</button>
+        <button class="secondary" onclick="showManualInput()">Ingresar dirección postal</button>
 
-        <!-- Formulario para ingresar ubicación manualmente -->
+        <!-- Formulario para ingresar dirección postal -->
         <div id="manual-input" style="display: none; margin-top: 20px;">
-            <input type="text" id="city-input" placeholder="Ciudad o país" class="form-control" />
-            <button class="primary" style="margin-top: 10px;" onclick="checkWeatherByCity()">Comprobar</button>
+            <input type="text" id="address-input" placeholder="Escribe tu dirección postal" class="form-control" />
+            <button class="primary" style="margin-top: 10px;" onclick="checkWeatherByAddress()">Comprobar</button>
         </div>
 
         <!-- Respuesta -->
         <div id="response"></div>
+
+        <!-- Imagen del clima -->
+        <img id="weather-image" src="" alt="Imagen del clima" style="display: none;" />
 
         <!-- Pronóstico extendido -->
         <div id="forecast" style="margin-top: 30px;"></div>
@@ -95,7 +105,7 @@
     </footer>
 
     <script>
-        // API Key de OpenWeatherMap
+        // TU CLAVE DE API DE OPENWEATHER
         const apiKey = "56b4e0af95612c13f91a673f2d132b71";
 
         // Obtener ubicación automáticamente
@@ -120,16 +130,16 @@
             });
         }
 
-        // Mostrar formulario para ingresar ubicación manualmente
+        // Mostrar formulario para ingresar dirección postal
         function showManualInput() {
             document.getElementById('manual-input').style.display = 'block';
         }
 
-        // Comprobar clima por ciudad
-        async function checkWeatherByCity() {
-            const city = document.getElementById('city-input').value.trim();
-            if (!city) {
-                alert("Por favor, ingresa una ciudad o país.");
+        // Comprobar clima por dirección postal
+        async function checkWeatherByAddress() {
+            const address = document.getElementById('address-input').value.trim();
+            if (!address) {
+                alert("Por favor, ingresa una dirección postal.");
                 return;
             }
 
@@ -138,7 +148,8 @@
             responseDiv.className = "loading";
 
             try {
-                const geoResponse = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${apiKey}`);
+                // Convertir dirección postal a coordenadas
+                const geoResponse = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(address)}&limit=1&appid=${apiKey}`);
                 const geoData = await geoResponse.json();
 
                 if (geoData.length === 0) {
@@ -159,6 +170,7 @@
         // Obtener y mostrar el clima
         async function fetchAndDisplayWeather(lat, lon) {
             const responseDiv = document.getElementById('response');
+            const weatherImage = document.getElementById('weather-image');
             const forecastDiv = document.getElementById('forecast');
 
             try {
@@ -169,6 +181,7 @@
                 const weather = weatherData.weather[0].description;
                 const temp = weatherData.main.temp;
 
+                // Mostrar respuesta según el clima
                 if (weather.includes("lluvia") || weather.includes("tormenta") || temp < 10 || temp > 35) {
                     responseDiv.textContent = `NO, no es un buen momento para salir al parque. (${weather}, ${temp}°C)`;
                     responseDiv.className = "danger";
@@ -176,6 +189,23 @@
                     responseDiv.textContent = `SÍ, puedes llevar a tu hijo/a al parque. (${weather}, ${temp}°C)`;
                     responseDiv.className = "success";
                 }
+
+                // Mostrar imagen del clima
+                const weatherCondition = weatherData.weather[0].main.toLowerCase();
+                let imageUrl = "";
+                if (weatherCondition.includes("clear")) {
+                    imageUrl = "https://via.placeholder.com/600x300?text=☀️+Soleado";
+                } else if (weatherCondition.includes("clouds")) {
+                    imageUrl = "https://via.placeholder.com/600x300?text=☁️+Nublado";
+                } else if (weatherCondition.includes("rain")) {
+                    imageUrl = "https://via.placeholder.com/600x300?text=🌧️+Lluvia";
+                } else if (weatherCondition.includes("thunderstorm")) {
+                    imageUrl = "https://via.placeholder.com/600x300?text=⚡+Tormenta";
+                } else {
+                    imageUrl = "https://via.placeholder.com/600x300?text=🌤️+Otro";
+                }
+                weatherImage.src = imageUrl;
+                weatherImage.style.display = "block";
 
                 // Obtener pronóstico extendido
                 const forecastResponse = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`);
